@@ -15,8 +15,6 @@
 
 The data is extracted from Twitter using the R package **twitteR**. We can extract the **last 3200 tweets** for each Twitter account.
 
-
-
 The data extracted have the following structure:
 
 <div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:300px; overflow-x: scroll; width:100%; "><table class="table table-striped table-bordered" style="margin-left: auto; margin-right: auto;">
@@ -40,69 +38,69 @@ The data extracted have the following structure:
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> Esta tarde estaré en Gijón, y mañana tendré el placer de regresar a l'Hospitalet para participar en un acto junto a… https://t.co/raSPPq0ZdU </td>
+   <td style="text-align:left;"> RT @ahorapodemos: 📣 En unos minutos podrás ver en 🔴 DIRECTO el acto de Unidas Podemos en la Universidad de Málaga. Por una #RedPública⚡️
+
+C… </td>
    <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:right;"> 73 </td>
+   <td style="text-align:right;"> 0 </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 2019-04-05 13:44:10 </td>
-   <td style="text-align:left;"> TRUE </td>
+   <td style="text-align:left;"> 2019-04-10 10:02:03 </td>
+   <td style="text-align:left;"> FALSE </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 1114161809215324166 </td>
+   <td style="text-align:left;"> 1115917851259547648 </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> &lt;a href="http://twitter.com" rel="nofollow"&gt;Twitter Web Client&lt;/a&gt; </td>
    <td style="text-align:left;"> Pablo_Iglesias_ </td>
-   <td style="text-align:right;"> 34 </td>
-   <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:left;"> FALSE </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> RT @MayoralRafa: Interesante entrevista a David Jiménez ex director de El Mundo. Habla de los tres poderes que existen en nuestro país en e… </td>
-   <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:right;"> 0 </td>
-   <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 2019-04-05 13:31:09 </td>
-   <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 1114158535187804160 </td>
-   <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> &lt;a href="http://twitter.com/download/iphone" rel="nofollow"&gt;Twitter for iPhone&lt;/a&gt; </td>
-   <td style="text-align:left;"> Pablo_Iglesias_ </td>
-   <td style="text-align:right;"> 195 </td>
+   <td style="text-align:right;"> 80 </td>
    <td style="text-align:left;"> TRUE </td>
    <td style="text-align:left;"> FALSE </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> RT @ikaitor: Ojo a esta entrevista a David Jiménez, exdirector de El Mundo y autor del libro El Director
-
-"En 2015 las élites veían con ter… </td>
+   <td style="text-align:left;"> Unidas Podemos propone medidas concretas y eficaces para garantizar servicios públicos de calidad en todos los pueb… https://t.co/ZU1QMaAouD </td>
    <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:right;"> 0 </td>
+   <td style="text-align:right;"> 384 </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 2019-04-05 13:23:03 </td>
-   <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 1114156494877089792 </td>
-   <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> &lt;a href="http://twitter.com/download/iphone" rel="nofollow"&gt;Twitter for iPhone&lt;/a&gt; </td>
-   <td style="text-align:left;"> Pablo_Iglesias_ </td>
-   <td style="text-align:right;"> 106 </td>
+   <td style="text-align:left;"> 2019-04-10 09:23:45 </td>
    <td style="text-align:left;"> TRUE </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> 1115908214120505349 </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> &lt;a href="https://studio.twitter.com" rel="nofollow"&gt;Twitter Media Studio&lt;/a&gt; </td>
+   <td style="text-align:left;"> Pablo_Iglesias_ </td>
+   <td style="text-align:right;"> 244 </td>
+   <td style="text-align:left;"> FALSE </td>
    <td style="text-align:left;"> FALSE </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> RT @VickyRosell: (Una periodista) vino a verme indignada porque desde la policía política del ministro Fernández Díaz se estaba ofreciendo… </td>
+   <td style="text-align:left;"> @robarrantez Me gusta mucho pero creo que no le desmerecen el Raul López de sus buenos momentos, Calderón o Ricky.… https://t.co/wq1TXQRLWf </td>
    <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:right;"> 0 </td>
-   <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 2019-04-05 13:22:25 </td>
-   <td style="text-align:left;"> FALSE </td>
-   <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> 1114156336978198530 </td>
-   <td style="text-align:left;"> NA </td>
+   <td style="text-align:right;"> 11 </td>
+   <td style="text-align:left;"> robarrantez </td>
+   <td style="text-align:left;"> 2019-04-10 08:08:21 </td>
+   <td style="text-align:left;"> TRUE </td>
+   <td style="text-align:left;"> 1115870761774931968 </td>
+   <td style="text-align:left;"> 1115889239143612416 </td>
+   <td style="text-align:left;"> 2506815112 </td>
    <td style="text-align:left;"> &lt;a href="http://twitter.com/download/iphone" rel="nofollow"&gt;Twitter for iPhone&lt;/a&gt; </td>
    <td style="text-align:left;"> Pablo_Iglesias_ </td>
-   <td style="text-align:right;"> 331 </td>
-   <td style="text-align:left;"> TRUE </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:left;"> FALSE </td>
+   <td style="text-align:left;"> FALSE </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> @Dani_Piedra Estoy de acuerdo. Es impresionante verle jugar. Es uno de los orgullos de Grecia </td>
+   <td style="text-align:left;"> FALSE </td>
+   <td style="text-align:right;"> 9 </td>
+   <td style="text-align:left;"> Dani_Piedra </td>
+   <td style="text-align:left;"> 2019-04-10 08:06:52 </td>
+   <td style="text-align:left;"> FALSE </td>
+   <td style="text-align:left;"> 1115872388439269377 </td>
+   <td style="text-align:left;"> 1115888866752376833 </td>
+   <td style="text-align:left;"> 370897949 </td>
+   <td style="text-align:left;"> &lt;a href="http://twitter.com/download/iphone" rel="nofollow"&gt;Twitter for iPhone&lt;/a&gt; </td>
+   <td style="text-align:left;"> Pablo_Iglesias_ </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:left;"> FALSE </td>
    <td style="text-align:left;"> FALSE </td>
   </tr>
 </tbody>
