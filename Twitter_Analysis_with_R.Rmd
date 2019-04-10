@@ -1,0 +1,474 @@
+---
+title: "Twitter Analysis with R"
+subtitle: "Analysis of Twitter accounts of the main political leaders in Spain before the elections of April 28, 2019"
+author: "Pol Castellano-Escuder"
+date: "Apr, 2019"
+output:
+  prettydoc::html_pretty:
+    keep_md: true
+    toc: true
+    toc_depth: 4
+    number_sections: true
+    theme: architect
+    highlight: github
+---
+
+**_This document is an EXPLORATORY document that consists of an example of text extraction and analysis on Twitter with R and in no case aims to lead to CONCLUSIONS._**
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, results = 'hide'}
+library(twitteR)
+library(wordcloud)
+library(tidytext)
+library(stringr)
+library(tidyverse)
+library(scales)
+library(knitr)
+library(kableExtra)
+library(lubridate)
+library(purrr)
+library(broom)
+library(ggfortify)
+
+twitter_key<-"your_twitter_key"
+twitter_secret<-"your_twitter_secret"
+access_token<-"your_access_token"
+access_secret<-"your_access_secret"
+
+oauth <- setup_twitter_oauth(twitter_key, twitter_secret, access_token, access_secret)
+```
+
+# Comparison between two Twitter accounts
+
+## Getting the data
+
+The data is extracted from Twitter using the R package **twitteR**. We can extract the **last 3200 tweets** for each Twitter account.
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE}
+myTweets1 <- userTimeline('@Pablo_Iglesias_', n=3200, includeRts = TRUE)
+myTweets2 <- userTimeline('@Albert_Rivera', n=3200, includeRts = TRUE)
+
+datos1 <- do.call("rbind", lapply(myTweets1, as.data.frame))
+datos2 <- do.call("rbind", lapply(myTweets2, as.data.frame))
+
+datos <- as.tibble(rbind(datos1, datos2))
+```
+
+The data extracted have the following structure:
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE}
+kable(datos[1:4,1:14]) %>% 
+  kable_styling(c("striped", "bordered")) %>% 
+  scroll_box(width = "100%", height = "300px")
+```
+
+## Word frequencies
+
+We can obtain the frequencies for each word in all extracted tweets. 
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE}
+remove_reg <- "&amp;|&lt;|&gt;"
+
+tidy_tweets <- datos %>% 
+  filter(!str_detect(text, "^RT")) %>%
+  mutate(text = str_remove_all(text, remove_reg)) %>%
+  unnest_tokens(word, text, token = "tweets") %>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"),
+         str_detect(word, "[a-z]"))
+
+frequency <- tidy_tweets %>% 
+  group_by(screenName) %>% 
+  count(word, sort = TRUE) %>% 
+  left_join(tidy_tweets %>% 
+  group_by(screenName) %>% 
+  summarise(total = n())) %>%
+  mutate(freq = n/total)
+
+frequency <- frequency %>% 
+  select(screenName, word, freq) %>% 
+  spread(screenName, freq)
+
+remove_words <- c("de","la","el","los","con", "al","en","se","hoy","del","es","las","para","una",
+                  "por", "a", "lo","su","esta","ha","han","mi","la")
+
+frequency <- frequency[!(frequency$word %in% remove_words) ,]
+frequency <- frequency[!(grepl("@",frequency$word)) ,]
+```
+
+This plot shows the frequency of words used by Albert Rivera and Pablo Iglesias. The words over the red line are used similary (in terms of frequency) by both users.
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10, fig.height = 7}
+ggplot(frequency, aes(Pablo_Iglesias_, Albert_Rivera)) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.25, height = 0.25) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  theme_minimal() + 
+  geom_abline(color = "red")
+```
+
+## Comparing word usage
+
+Here we can see which words are most likely to be from Albert Rivera's account or from Pablo Iglesias's account.  
+
+In the following plot we can see the odds ratios of the top 15 most distinctive words for each account.
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10, fig.height = 7}
+word_ratios <- tidy_tweets %>%
+  filter(!str_detect(word, "^@")) %>%
+  count(word, screenName) %>%
+  group_by(word) %>%
+  filter(sum(n) >= 10) %>%
+  ungroup() %>%
+  spread(screenName, n, fill = 0) %>%
+  mutate_if(is.numeric, funs((. + 1) / (sum(.) + 1))) %>%
+  mutate(logratio = log(Pablo_Iglesias_ / Albert_Rivera)) %>%
+  arrange(desc(logratio))
+
+#word_ratios %>% 
+#  arrange(abs(logratio))
+
+word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(15, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  ylab("log odds ratio (Pablo Iglesias/Albert Rivera)") +
+  theme_minimal() +
+  scale_fill_discrete(name = "", labels = c("Pablo Iglesias", "Albert Rivera"))
+```
+
+## Changes in word use
+
+The frequencies of the words used by users may change over time. Here we will explore the most important word frequency changes along time for each user. 
+
+We will fit a generalized linear model using "binomial" family for modeling and we will pick associations with an adjusted p.value below 0.05. The following plot shows the results.
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10}
+words_by_time <- tidy_tweets %>%
+  filter(!str_detect(word, "^@")) %>%
+  mutate(time_floor = floor_date(created, unit = "1 month")) %>%
+  count(time_floor, screenName, word) %>%
+  group_by(screenName, time_floor) %>%
+  mutate(time_total = sum(n)) %>%
+  group_by(screenName, word) %>%
+  mutate(word_total = sum(n)) %>%
+  ungroup() %>%
+  rename(count = n) %>%
+  filter(word_total > 30)
+
+nested_data <- words_by_time %>%
+  nest(-word, -screenName) 
+
+nested_models <- nested_data %>%
+  mutate(models = map(data, ~ glm(cbind(count, time_total) ~ time_floor, ., 
+                                  family = "binomial")))
+
+slopes <- nested_models %>%
+  unnest(map(models, tidy)) %>%
+  filter(term == "time_floor") %>%
+  mutate(adjusted.p.value = p.adjust(p.value))
+
+top_slopes <- slopes %>% 
+  filter(adjusted.p.value < 0.05)
+
+words_by_time %>%
+  inner_join(top_slopes, by = c("word", "screenName")) %>%
+  ggplot(aes(time_floor, count/time_total, color = word)) +
+  geom_line(size = 1.3) +
+  theme_minimal() +
+  facet_grid(~screenName) +
+  labs(x = NULL, y = "Word frequency")
+```
+  
+## Retweets
+
+This plot shows which words are more likely to be retweeted for Albert Rivera and Pablo Iglesias.
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10}
+tidy_tweets <- datos %>% 
+  filter(!str_detect(text, "^(RT|@)")) %>%
+  mutate(text = str_remove_all(text, remove_reg)) %>%
+  unnest_tokens(word, text, token = "tweets", strip_url = TRUE) %>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"))
+
+totals <- tidy_tweets %>% 
+  group_by(screenName, id) %>% 
+  summarise(rts = first(retweetCount)) %>% 
+  group_by(screenName) %>% 
+  summarise(total_rts = sum(rts))
+
+word_by_rts <- tidy_tweets %>% 
+  group_by(id, word, screenName) %>% 
+  summarise(rts = first(retweetCount)) %>% 
+  group_by(screenName, word) %>% 
+  summarise(retweets = median(rts), uses = n()) %>%
+  left_join(totals) %>%
+  filter(retweets != 0) %>%
+  ungroup()
+
+#word_by_rts %>% 
+#  filter(uses >= 5) %>%
+#  arrange(desc(retweets))
+
+word_by_rts %>%
+  filter(uses >= 5) %>%
+  group_by(screenName) %>%
+  top_n(10, retweets) %>%
+  arrange(retweets) %>%
+  ungroup() %>%
+  mutate(word = factor(word, unique(word))) %>%
+  ungroup() %>%
+  ggplot(aes(word, retweets, fill = screenName)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ screenName, scales = "free", ncol = 2) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = NULL, 
+       y = "Median # of retweets for tweets containing each word")
+```
+
+## Favorites
+
+This plot is very similar to the previous plot and it shows which words are more likely to be favorited for Albert Rivera and Pablo Iglesias.
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10}
+totals <- tidy_tweets %>% 
+  group_by(screenName, id) %>% 
+  summarise(favs = first(favoriteCount)) %>% 
+  group_by(screenName) %>% 
+  summarise(total_favs = sum(favs))
+
+word_by_favs <- tidy_tweets %>% 
+  group_by(id, word, screenName) %>% 
+  summarise(favs = first(favoriteCount)) %>% 
+  group_by(screenName, word) %>% 
+  summarise(favorites = median(favs), uses = n()) %>%
+  left_join(totals) %>%
+  filter(favorites != 0) %>%
+  ungroup()
+
+word_by_favs %>%
+  filter(uses >= 5) %>%
+  group_by(screenName) %>%
+  top_n(10, favorites) %>%
+  arrange(favorites) %>%
+  ungroup() %>%
+  mutate(word = factor(word, unique(word))) %>%
+  ungroup() %>%
+  ggplot(aes(word, favorites, fill = screenName)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ screenName, scales = "free", ncol = 2) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = NULL, 
+       y = "Median # of favorites for tweets containing each word")
+```
+
+# Comparison between more than two Twitter accounts
+
+This block is an example of the analysis of more than two Twitter accounts. The only difference with previous plots is the number of accounts (except in PCA). Therefore, the explanation of the plots is the same ;-)
+
+## Getting the data
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10}
+myTweets1 <- userTimeline('@Pablo_Iglesias_', n=3200, includeRts = TRUE)
+myTweets2 <- userTimeline('@Albert_Rivera', n=3200, includeRts = TRUE)
+myTweets3 <- userTimeline('@pablocasado_', n=3200, includeRts = TRUE)
+myTweets4 <- userTimeline('@sanchezcastejon', n=3200, includeRts = TRUE)
+myTweets5 <- userTimeline('@Santi_ABASCAL', n=3200, includeRts = TRUE)
+myTweets6 <- userTimeline('@agarzon', n=3200, includeRts = TRUE)
+
+datos1 <- do.call("rbind", lapply(myTweets1, as.data.frame))
+datos2 <- do.call("rbind", lapply(myTweets2, as.data.frame))
+datos3 <- do.call("rbind", lapply(myTweets3, as.data.frame))
+datos4 <- do.call("rbind", lapply(myTweets4, as.data.frame))
+datos5 <- do.call("rbind", lapply(myTweets5, as.data.frame))
+datos6 <- do.call("rbind", lapply(myTweets6, as.data.frame))
+
+datos <- as.tibble(rbind(datos1, datos2, datos3, datos4, datos5, datos6))
+
+remove_reg <- "&amp;|&lt;|&gt;"
+
+tidy_tweets <- datos %>% 
+  filter(!str_detect(text, "^RT")) %>%
+  mutate(text = str_remove_all(text, remove_reg)) %>%
+  unnest_tokens(word, text, token = "tweets") %>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"),
+         str_detect(word, "[a-z]"))
+
+frequency <- tidy_tweets %>% 
+  group_by(screenName) %>% 
+  count(word, sort = TRUE) %>% 
+  left_join(tidy_tweets %>% 
+              group_by(screenName) %>% 
+              summarise(total = n())) %>%
+  mutate(freq = n/total)
+
+frequency <- frequency %>% 
+  select(screenName, word, freq) %>% 
+  spread(screenName, freq)
+
+remove_words <- c("de","la","el","los","con", "al","en","se","hoy","del","es","las","para","una",
+                  "por", "a", "lo","su","esta","ha","han","mi","la")
+
+frequency <- frequency[!(frequency$word %in% remove_words) ,]
+frequency <- frequency[!(grepl("@",frequency$word)) ,]
+
+frequency[is.na(frequency)] <- 0
+liders <- colnames(frequency)[2:ncol(frequency)]
+frequency <- column_to_rownames(frequency, "word")
+frequency <- as.tibble(t(frequency))
+frequency$liders <- liders
+frequency <- column_to_rownames(frequency, "liders")
+```
+
+## Principal Component Analysis between all accounts
+
+The Principal Component Analysis is a multivariate method for the reduction of dimention. 
+
+Using the frequency matrix for all words in all accounts we can make the following PCA. The closer the points are in the space the more similar they are and vice versa.
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10, fig.height = 7}
+autoplot(prcomp(frequency[,1:(ncol(frequency)-1)]), data = frequency, colour = c("darkred", "darkorange1", "deepskyblue3", "purple", "red2", "limegreen"),
+         shape = FALSE, label = TRUE, label.size = 4) +
+  theme_minimal() 
+```
+
+As a small conclusion... 
+
+In the plot we can see 3 groups, which COULD correspond to the left, right and far right political parties. However, we will not say which is which ;-)
+
+## Changes in word use
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10, fig.height = 7}
+words_by_time <- tidy_tweets %>%
+  filter(!str_detect(word, "^@")) %>%
+  mutate(time_floor = floor_date(created, unit = "1 month")) %>%
+  count(time_floor, screenName, word) %>%
+  group_by(screenName, time_floor) %>%
+  mutate(time_total = sum(n)) %>%
+  group_by(screenName, word) %>%
+  mutate(word_total = sum(n)) %>%
+  ungroup() %>%
+  rename(count = n) %>%
+  filter(word_total > 30)
+
+nested_data <- words_by_time %>%
+  nest(-word, -screenName) 
+
+nested_models <- nested_data %>%
+  mutate(models = map(data, ~ glm(cbind(count, time_total) ~ time_floor, ., 
+                                  family = "binomial")))
+
+slopes <- nested_models %>%
+  unnest(map(models, tidy)) %>%
+  filter(term == "time_floor") %>%
+  mutate(adjusted.p.value = p.adjust(p.value))
+
+top_slopes <- slopes %>% 
+  filter(adjusted.p.value < 0.05)
+
+words_by_time %>%
+  inner_join(top_slopes, by = c("word", "screenName")) %>%
+  ggplot(aes(time_floor, count/time_total, color = word)) +
+  geom_line(size = 1.3) +
+  theme_minimal() +
+  facet_grid(~screenName) +
+  labs(x = NULL, y = "Word frequency")
+```
+
+## Retweets
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10, fig.height = 7}
+tidy_tweets <- datos %>% 
+  filter(!str_detect(text, "^(RT|@)")) %>%
+  mutate(text = str_remove_all(text, remove_reg)) %>%
+  unnest_tokens(word, text, token = "tweets", strip_url = TRUE) %>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"))
+
+totals <- tidy_tweets %>% 
+  group_by(screenName, id) %>% 
+  summarise(rts = first(retweetCount)) %>% 
+  group_by(screenName) %>% 
+  summarise(total_rts = sum(rts))
+
+word_by_rts <- tidy_tweets %>% 
+  group_by(id, word, screenName) %>% 
+  summarise(rts = first(retweetCount)) %>% 
+  group_by(screenName, word) %>% 
+  summarise(retweets = median(rts), uses = n()) %>%
+  left_join(totals) %>%
+  filter(retweets != 0) %>%
+  ungroup()
+
+#word_by_rts %>% 
+#  filter(uses >= 5) %>%
+#  arrange(desc(retweets))
+
+word_by_rts %>%
+  filter(uses >= 5) %>%
+  group_by(screenName) %>%
+  top_n(10, retweets) %>%
+  arrange(retweets) %>%
+  ungroup() %>%
+  mutate(word = factor(word, unique(word))) %>%
+  ungroup() %>%
+  ggplot(aes(word, retweets, fill = screenName)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ screenName, scales = "free", ncol = 2) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = NULL, 
+       y = "Median # of retweets for tweets containing each word")
+```
+
+## Favorites
+
+```{r, echo = FALSE, warning = FALSE, comment = NA, message=FALSE, fig.align='center', fig.width = 10, fig.height = 7}
+totals <- tidy_tweets %>% 
+  group_by(screenName, id) %>% 
+  summarise(favs = first(favoriteCount)) %>% 
+  group_by(screenName) %>% 
+  summarise(total_favs = sum(favs))
+
+word_by_favs <- tidy_tweets %>% 
+  group_by(id, word, screenName) %>% 
+  summarise(favs = first(favoriteCount)) %>% 
+  group_by(screenName, word) %>% 
+  summarise(favorites = median(favs), uses = n()) %>%
+  left_join(totals) %>%
+  filter(favorites != 0) %>%
+  ungroup()
+
+word_by_favs %>%
+  filter(uses >= 5) %>%
+  group_by(screenName) %>%
+  top_n(10, favorites) %>%
+  arrange(favorites) %>%
+  ungroup() %>%
+  mutate(word = factor(word, unique(word))) %>%
+  ungroup() %>%
+  ggplot(aes(word, favorites, fill = screenName)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ screenName, scales = "free", ncol = 2) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = NULL, 
+       y = "Median # of favorites for tweets containing each word")
+```
+
+# References
+
+1) Mullen, Lincoln. 2016. tokenizers: A Consistent Interface to Tokenize Natural Language Text. https://CRAN.R-project.org/package=tokenizers.
+
+2) Henry, Lionel, and Hadley Wickham. 2018. Purrr: Functional Programming Tools. https://CRAN.R-project.org/package=purrr.
+
+3) Julia Silge and David Robinson. 2019. Text Mining with R. https://www.tidytextmining.com/twitter.html
+
